@@ -3,8 +3,12 @@
 // Log Analytics workspace, an 'azuremonitor' private endpoint in the PE subnet,
 // and the four Azure Monitor private DNS zones.
 //
-// Ingestion and query are both PrivateOnly, so traces are written and read only
-// from networks connected to the scope. Like private-endpoint-dns.bicep, zones
+// Query is PrivateOnly, so traces are read only from networks connected to the
+// scope. Ingestion is Open: live testing showed that with ingestion PrivateOnly,
+// the component rejects private ingestion (403 "Component private link id does
+// not match incoming link") and no Foundry traces arrive. The component's own
+// public ingestion stays disabled, so ingestion still arrives only through the
+// private endpoint. Like private-endpoint-dns.bicep, zones
 // are created and linked to the VNet by default; when dnsZonesResourceGroup is
 // set they are referenced from that resource group (in dnsZonesSubscription,
 // defaulting to this subscription) instead of being created.
@@ -54,7 +58,7 @@ resource ampls 'Microsoft.Insights/privateLinkScopes@2021-07-01-preview' = {
   location: 'global'
   properties: {
     accessModeSettings: {
-      ingestionAccessMode: 'PrivateOnly'
+      ingestionAccessMode: 'Open'
       queryAccessMode: 'PrivateOnly'
     }
   }

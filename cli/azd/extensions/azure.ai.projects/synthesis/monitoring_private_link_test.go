@@ -34,6 +34,24 @@ func privateLinkReader(group, scopeID string) *fakeReader {
 	}}
 }
 
+func TestMonitorPrivateLinkAccessModes(t *testing.T) {
+	t.Parallel()
+	// Ingestion must stay Open: PrivateOnly ingestion makes a scoped component
+	// reject private ingestion (403) and no traces arrive. Query stays PrivateOnly,
+	// and the component's own public ingestion is disabled in monitoring.bicep.
+	for _, name := range []string{"templates/main.arm.json", "templates/existing-project.arm.json"} {
+		raw, err := templatesFS.ReadFile(name)
+		require.NoError(t, err)
+		text := string(raw)
+		assert.Contains(t, text, `"ingestionAccessMode": "Open"`, name)
+		assert.Contains(t, text, `"queryAccessMode": "PrivateOnly"`, name)
+	}
+	bicep, err := templatesFS.ReadFile("templates/modules/monitor-private-link.bicep")
+	require.NoError(t, err)
+	assert.Contains(t, string(bicep), "ingestionAccessMode: 'Open'")
+	assert.Contains(t, string(bicep), "queryAccessMode: 'PrivateOnly'")
+}
+
 func TestCheckMonitorPrivateLinkConflict(t *testing.T) {
 	t.Parallel()
 	const ownedScope = "/subscriptions/" + testSub + "/resourceGroups/rg/providers/Microsoft.Insights/privateLinkScopes/ampls-abc"

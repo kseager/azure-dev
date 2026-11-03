@@ -191,13 +191,14 @@ unreadable resources, and authentication or ingestion policies that would need
 to be weakened. ApiKey setup does not enable local authentication. A new
 project with a `network:` block that uses your own agent subnet gets a private
 monitoring path: the component and workspace disable public ingestion and
-query, and azd adds an Azure Monitor Private Link Scope (Private Only), an
-`azuremonitor` private endpoint, and the four Azure Monitor private DNS zones.
-Traces are then readable only from a network that reaches the scope. Live
-testing found that Foundry's own service-side traces (prompt and hosted agents)
-did not reach a component with public ingestion disabled, so expect no
-service-side traces in this mode until the platform supports private ingestion;
-the private path is provisioned and verified, but trace arrival is not.
+query, and azd adds an Azure Monitor Private Link Scope (query Private Only,
+ingestion Open), an `azuremonitor` private endpoint, and the four Azure Monitor
+private DNS zones. Traces are then readable only from a network that reaches
+the scope. Ingestion access mode is Open because live testing showed that a
+Private Only ingestion mode makes the component reject private ingestion (403)
+and no Foundry service-side traces (prompt and hosted agents) arrive; with
+ingestion Open and the component's public ingestion disabled, those traces
+arrived and were read privately from inside the network.
 Unsupported private-network cases never block provisioning: managed egress,
 connecting an existing component, or a virtual network that already has an
 Azure Monitor private endpoint skip automatic monitoring and azd prints a
