@@ -424,3 +424,6 @@ output AZURE_CONTAINER_REGISTRY_RESOURCE_ID string = !includeAcr ? '' : (empty(e
 output AZURE_AI_PROJECT_ACR_CONNECTION_NAME string = !includeAcr ? '' : (empty(existingAcrResourceId) ? acr!.outputs.connectionName : existingAcrConnection!.outputs.acrConnectionName)
 output AZURE_FOUNDRY_NETWORK_MODE string = !enableNetworkIsolation ? 'none' : (useManagedEgress ? 'managed' : 'byo')
 output AZURE_FOUNDRY_MANAGED_ISOLATION_MODE string = useManagedNetwork ? managedIsolationMode : ''
+output NETWORK_VNET_ID string = enableNetworkIsolation ? network!.outputs.vnetId : ''
+output NETWORK_VNET_LOCATION string = enableNetworkIsolation ? network!.outputs.vnetLocation : ''
+output NETWORK_PE_SUBNET_ID string = enableNetworkIsolation ? network!.outputs.peSubnetId : ''

@@ -16,7 +16,16 @@ param existingConnectionName string = ''
 param environmentName string
 param resourceTokenSalt string = ''
 
+@description('When true, new monitoring resources accept ingestion and queries only through an Azure Monitor private link.')
+param privateNetwork bool = false
+param vnetId string = ''
+param vnetLocation string = ''
+param peSubnetId string = ''
+param dnsZonesResourceGroup string = ''
+param dnsZonesSubscription string = ''
+
 var createResources = mode == 'create'
+var publicNetworkAccess = privateNetwork ? 'Disabled' : 'Enabled'
 var token = uniqueString(projectResourceId, resourceGroup().id, resourceTokenSalt)
 var projectParts = split(projectResourceId, '/')
 var componentParts = split(applicationInsightsResourceId, '/')
@@ -36,6 +45,8 @@ resource workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = if (c
       name: 'PerGB2018'
     }
     retentionInDays: 30
+    publicNetworkAccessForIngestion: publicNetworkAccess
+    publicNetworkAccessForQuery: publicNetworkAccess
   }
 }
 
@@ -47,6 +58,22 @@ resource component 'Microsoft.Insights/components@2020-02-02' = if (createResour
   properties: {
     Application_Type: 'web'
     WorkspaceResourceId: workspace!.id
+    publicNetworkAccessForIngestion: publicNetworkAccess
+    publicNetworkAccessForQuery: publicNetworkAccess
+  }
+}
+
+module privateLink 'monitor-private-link.bicep' = if (createResources && privateNetwork) {
+  name: 'foundry-monitoring-private-link'
+  params: {
+    location: vnetLocation
+    suffix: token
+    applicationInsightsResourceId: component!.id
+    logAnalyticsWorkspaceResourceId: workspace!.id
+    vnetId: vnetId
+    peSubnetId: peSubnetId
+    dnsZonesResourceGroup: dnsZonesResourceGroup
+    dnsZonesSubscription: dnsZonesSubscription
   }
 }
 

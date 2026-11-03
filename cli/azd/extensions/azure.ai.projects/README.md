@@ -188,11 +188,18 @@ Log Analytics Reader role on the Application Insights resource; azd does not
 grant it.
 Discovery rejects conflicting destinations, protected names, ambiguous sharing,
 unreadable resources, and authentication or ingestion policies that would need
-to be weakened. ApiKey setup does not enable local authentication or configure
-private-network ingestion. A new project with a `network:` block is rejected
-unless you set `monitoring.enabled: false`, because automatic monitoring cannot
-yet use private ingestion. Such failures can fail normal provisioning; there
-is no second best-effort deployment or agent deployment repair hook.
+to be weakened. ApiKey setup does not enable local authentication. A new
+project with a `network:` block that uses your own agent subnet gets a private
+monitoring path: the component and workspace disable public ingestion and
+query, and azd adds an Azure Monitor Private Link Scope (Private Only), an
+`azuremonitor` private endpoint, and the four Azure Monitor private DNS zones.
+Traces are then readable only from a network that reaches the scope. If the
+virtual network already has an Azure Monitor private endpoint, provisioning
+fails before any change; set `monitoring.enabled: false` to opt out. Managed
+egress and connecting an existing component to a private project are rejected
+unless you set `monitoring.enabled: false`. Such failures can fail normal
+provisioning; there is no second best-effort deployment or agent deployment
+repair hook.
 
 Monitoring creates billable Azure resources and can store agent telemetry,
 including application-supplied content. Review your application's telemetry,

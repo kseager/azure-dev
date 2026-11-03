@@ -1260,6 +1260,7 @@ func writeExistingProjectBicepTemplates(
 		{"templates/modules/foundry-project.bicep", "modules/foundry-project.bicep"},
 		{"templates/modules/monitoring.bicep", "modules/monitoring.bicep"},
 		{"templates/modules/monitoring-connection.bicep", "modules/monitoring-connection.bicep"},
+		{"templates/modules/monitor-private-link.bicep", "modules/monitor-private-link.bicep"},
 	}
 	if acrMode == infraEjectAcrCreate || (acrMode == infraEjectAcrReuseConnect && !acrPullAssigned) {
 		registrySource, err := fs.ReadFile(

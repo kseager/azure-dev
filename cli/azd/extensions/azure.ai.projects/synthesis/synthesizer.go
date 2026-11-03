@@ -277,10 +277,19 @@ func Synthesize(in Input) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	if mode, _ := monitoring["monitoringMode"].(string); netMode != NetworkModeNone && mode != "" && mode != "none" {
+	mode, _ := monitoring["monitoringMode"].(string)
+	monitoringOn := mode != "" && mode != "none"
+	switch {
+	case netMode == NetworkModeManaged && monitoringOn:
 		return nil, errors.New(
-			"synthesis: automatic monitoring does not configure private-network ingestion; " +
+			"synthesis: automatic monitoring does not yet support a managed network " +
+				"(it needs a managed private endpoint to the Azure Monitor private link scope); " +
 				"set monitoring.enabled: false on the project service",
+		)
+	case netMode == NetworkModeByo && monitoringOn && mode != "create":
+		return nil, errors.New(
+			"synthesis: connecting an existing Application Insights resource does not configure " +
+				"private-network ingestion; set monitoring.enabled: false on the project service",
 		)
 	}
 	maps.Copy(params, monitoring)

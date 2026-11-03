@@ -130,12 +130,17 @@ func TestSynthesizeMonitoringPrivateNetwork(t *testing.T) {
 	monitoring := []struct {
 		name     string
 		settings string
-		wantErr  bool
+		wantErr  string
+		wantMode string
 	}{
-		{name: "default", wantErr: true},
-		{name: "empty block", settings: "    monitoring: {}\n", wantErr: true},
-		{name: "BYO component", settings: "    monitoring:\n      applicationInsightsResourceId: " + component + "\n", wantErr: true},
-		{name: "explicit opt out", settings: "    monitoring:\n      enabled: false\n"},
+		{name: "default", wantErr: "does not yet support a managed network", wantMode: "create"},
+		{name: "empty block", settings: "    monitoring: {}\n", wantErr: "does not yet support a managed network", wantMode: "create"},
+		{
+			name:     "BYO component",
+			settings: "    monitoring:\n      applicationInsightsResourceId: " + component + "\n",
+			wantErr:  "does not yet support a managed network", wantMode: "reuse-connect",
+		},
+		{name: "explicit opt out", settings: "    monitoring:\n      enabled: false\n", wantMode: "none"},
 	}
 	for networkName, network := range networks {
 		for _, tt := range monitoring {
@@ -145,13 +150,21 @@ func TestSynthesizeMonitoringPrivateNetwork(t *testing.T) {
 					RawAzureYAML: []byte("services:\n  foundry:\n    host: azure.ai.project\n" + network + tt.settings),
 					ServiceName:  "foundry",
 				})
-				if tt.wantErr {
-					require.ErrorContains(t, err, "does not configure private-network ingestion")
+				wantErr := tt.wantErr
+				switch {
+				case networkName == "BYO egress" && tt.wantMode == "create":
+					wantErr = ""
+				case networkName == "BYO egress" && tt.wantMode == "reuse-connect":
+					wantErr = "does not configure private-network ingestion"
+				}
+				if wantErr != "" {
+					require.ErrorContains(t, err, wantErr)
 					require.ErrorContains(t, err, "monitoring.enabled: false")
 					return
 				}
 				require.NoError(t, err)
-				assert.Equal(t, "none", result.Parameters["monitoringMode"])
+				assert.Equal(t, tt.wantMode, result.Parameters["monitoringMode"])
+				assert.Equal(t, true, result.Parameters["enableNetworkIsolation"])
 			})
 		}
 	}
