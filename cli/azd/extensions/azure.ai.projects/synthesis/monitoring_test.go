@@ -128,17 +128,17 @@ func TestSynthesizeMonitoringPrivateNetwork(t *testing.T) {
 			"      peSubnet: {vnet: " + vnet + ", name: pe-subnet, prefix: 192.168.1.0/24}\n",
 	}
 	monitoring := []struct {
-		name     string
-		settings string
-		wantErr  string
-		wantMode string
+		name        string
+		settings    string
+		wantMode    string
+		wantWarning bool
 	}{
-		{name: "default", wantErr: "does not yet support a managed network", wantMode: "create"},
-		{name: "empty block", settings: "    monitoring: {}\n", wantErr: "does not yet support a managed network", wantMode: "create"},
+		{name: "default", wantMode: "create"},
+		{name: "empty block", settings: "    monitoring: {}\n", wantMode: "create"},
 		{
 			name:     "BYO component",
 			settings: "    monitoring:\n      applicationInsightsResourceId: " + component + "\n",
-			wantErr:  "does not yet support a managed network", wantMode: "reuse-connect",
+			wantMode: "none", wantWarning: true,
 		},
 		{name: "explicit opt out", settings: "    monitoring:\n      enabled: false\n", wantMode: "none"},
 	}
@@ -150,20 +150,18 @@ func TestSynthesizeMonitoringPrivateNetwork(t *testing.T) {
 					RawAzureYAML: []byte("services:\n  foundry:\n    host: azure.ai.project\n" + network + tt.settings),
 					ServiceName:  "foundry",
 				})
-				wantErr := tt.wantErr
-				switch {
-				case networkName == "BYO egress" && tt.wantMode == "create":
-					wantErr = ""
-				case networkName == "BYO egress" && tt.wantMode == "reuse-connect":
-					wantErr = "does not configure private-network ingestion"
-				}
-				if wantErr != "" {
-					require.ErrorContains(t, err, wantErr)
-					require.ErrorContains(t, err, "monitoring.enabled: false")
-					return
-				}
 				require.NoError(t, err)
-				assert.Equal(t, tt.wantMode, result.Parameters["monitoringMode"])
+				wantMode, wantWarning := tt.wantMode, tt.wantWarning
+				if networkName == "managed egress" && wantMode == "create" {
+					wantMode, wantWarning = "none", true
+				}
+				assert.Equal(t, wantMode, result.Parameters["monitoringMode"])
+				if wantWarning {
+					assert.Equal(t, []string{PrivateNetworkMonitoringWarning}, result.Warnings)
+					assert.Equal(t, "", result.Parameters["applicationInsightsResourceId"])
+				} else {
+					assert.Empty(t, result.Warnings)
+				}
 				assert.Equal(t, true, result.Parameters["enableNetworkIsolation"])
 			})
 		}

@@ -89,6 +89,11 @@ func (p *FoundryProvisioningProvider) prepareMonitoring(
 	client *armresources.DeploymentsClient,
 	progress grpcbroker.ProgressFunc,
 ) error {
+	if p.synthResult != nil {
+		for _, warning := range p.synthResult.Warnings {
+			progress("Warning: " + warning)
+		}
+	}
 	mode, err := monitoringParameter(source, "monitoringMode")
 	if err != nil {
 		return err
@@ -169,10 +174,17 @@ func (p *FoundryProvisioningProvider) prepareMonitoring(
 	}
 	if monitoringPrivateNetwork(source) {
 		if mode != "create" {
-			return fmt.Errorf("connecting an existing Application Insights resource does not configure " +
-				"private-network ingestion; preserve the existing connection or disable monitoring setup")
+			source.parameters["monitoringMode"] = map[string]any{"value": "none"}
+			progress("Warning: " + synthesis.PrivateNetworkMonitoringWarning)
+			return nil
 		}
 		if err := p.checkMonitorPrivateLinkConflict(ctx, source, &resolver, progress); err != nil {
+			if _, conflict := errors.AsType[*synthesis.MonitorPrivateLinkConflictError](err); conflict {
+				// Skip rather than fail so an existing private network keeps provisioning.
+				source.parameters["monitoringMode"] = map[string]any{"value": "none"}
+				progress("Warning: automatic monitoring was skipped. " + err.Error())
+				return nil
+			}
 			return err
 		}
 	} else {

@@ -102,6 +102,9 @@ type Result struct {
 	// MonitoringExplicit distinguishes authored monitoring from the new-project
 	// default, so an upgrade cannot opt an already-provisioned project into setup.
 	MonitoringExplicit bool
+	// Warnings are user-facing notices about settings that were adjusted, such as
+	// skipped automatic monitoring.
+	Warnings []string
 	// ACRMode is the greenfield registry mode: create,
 	// reuse-connect, or none.
 	ACRMode string
@@ -262,7 +265,7 @@ func Synthesize(in Input) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	if includeAcr && netMode != NetworkModeNone {
+	if includeAcr && netMode != NetworkModeNone && hosting == nil {
 		return nil, errors.New(
 			"synthesis: private networking does not support an auto-created Azure Container Registry; specify an image instead",
 		)
@@ -277,27 +280,23 @@ func Synthesize(in Input) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	var warnings []string
 	mode, _ := monitoring["monitoringMode"].(string)
-	monitoringOn := mode != "" && mode != "none"
-	switch {
-	case netMode == NetworkModeManaged && monitoringOn:
-		return nil, errors.New(
-			"synthesis: automatic monitoring does not yet support a managed network " +
-				"(it needs a managed private endpoint to the Azure Monitor private link scope); " +
-				"set monitoring.enabled: false on the project service",
-		)
-	case netMode == NetworkModeByo && monitoringOn && mode != "create":
-		return nil, errors.New(
-			"synthesis: connecting an existing Application Insights resource does not configure " +
-				"private-network ingestion; set monitoring.enabled: false on the project service",
-		)
+	if netMode != NetworkModeNone && mode != "" && mode != "none" &&
+		!(netMode == NetworkModeByo && mode == "create") {
+		// This private-network setup is not supported yet; skip rather than fail provisioning.
+		monitoring = map[string]any{"monitoringMode": "none", "applicationInsightsResourceId": ""}
+		warnings = append(warnings, PrivateNetworkMonitoringWarning)
 	}
 	maps.Copy(params, monitoring)
 
 	if hosting != nil {
 		params["agentHosting"] = agentHostingParameter{
 			Enabled: true, HostingType: "ManagedCluster", Name: "default",
-			ClusterResourceID: hosting.ClusterResourceID,
+			ClusterResourceID:                   hosting.ClusterResourceID,
+			StorageAccountResourceID:            hosting.StorageAccountResourceID,
+			HostingManagementIdentityResourceID: hosting.HostingManagementIdentityResourceID,
+			WorkloadIdentityResourceID:          hosting.WorkloadIdentityResourceID,
 		}
 	}
 
@@ -306,8 +305,14 @@ func Synthesize(in Input) (*Result, error) {
 		NetworkMode:        netMode,
 		MonitoringExplicit: !in.InfrastructureOwnsMonitoring && svc.Monitoring.Kind != 0,
 		Hosting:            hosting,
+		Warnings:           warnings,
 	}, nil
 }
+
+// PrivateNetworkMonitoringWarning is shown when automatic monitoring is skipped for a private network.
+const PrivateNetworkMonitoringWarning = "Automatic Application Insights monitoring does not support this " +
+	"private-network configuration (managed egress, or connecting an existing component), so monitoring was not " +
+	"configured. Agent traces will not be collected automatically."
 
 // GreenfieldACRMode distinguishes selectors from deployed outputs.
 func GreenfieldACRMode(in Input) (string, error) {
@@ -539,7 +544,7 @@ func loadProjectService(
 	}
 
 	var svc projectService
-	if err := validateAgentHostingInputs(node, serviceName); err != nil {
+	if err := ValidateAgentHostingInputs(node, serviceName); err != nil {
 		return svc, err
 	}
 	if err := node.Decode(&svc); err != nil {
