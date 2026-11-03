@@ -193,7 +193,11 @@ project with a `network:` block that uses your own agent subnet gets a private
 monitoring path: the component and workspace disable public ingestion and
 query, and azd adds an Azure Monitor Private Link Scope (Private Only), an
 `azuremonitor` private endpoint, and the four Azure Monitor private DNS zones.
-Traces are then readable only from a network that reaches the scope. If the
+Traces are then readable only from a network that reaches the scope. Live
+testing found that Foundry's own service-side traces (prompt and hosted agents)
+did not reach a component with public ingestion disabled, so expect no
+service-side traces in this mode until the platform supports private ingestion;
+the private path is provisioned and verified, but trace arrival is not. If the
 virtual network already has an Azure Monitor private endpoint, provisioning
 fails before any change; set `monitoring.enabled: false` to opt out. Managed
 egress and connecting an existing component to a private project are rejected
