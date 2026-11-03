@@ -316,6 +316,22 @@ resource byoFoundryAccount 'Microsoft.CognitiveServices/accounts@2026-07-15-prev
   }
 }
 
+// VNet-injected (BYO egress) projects need a project-level Agents capability
+// host so agent traffic and traces route through the private network. The
+// platform creates only the account-level host.
+#disable-next-line BCP081
+resource byoProjectCapabilityHost 'Microsoft.CognitiveServices/accounts/projects/capabilityHosts@2025-04-01-preview' = if (useByoNetwork) {
+  name: '${activeFoundryAccountName}/${foundryProjectName}/agents'
+  properties: {
+    #disable-next-line BCP037
+    capabilityHostKind: 'Agents'
+  }
+  dependsOn: [
+    foundryAccount::project
+    byoFoundryAccount::project
+  ]
+}
+
 // Managed-network isolation (managed egress only). Applies the chosen outbound
 // isolation mode to the Microsoft-managed VNet that hosts the agent runtime.
 // Only deployed when an explicit isolationMode is requested; otherwise the

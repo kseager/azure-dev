@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.48.1.52935",
-      "templateHash": "15096591180338143477"
+      "templateHash": "2432952303527346653"
     }
   },
   "definitions": {
@@ -385,7 +385,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.48.1.52935",
-              "templateHash": "3590758027701824840"
+              "templateHash": "13379278077384385671"
             }
           },
           "definitions": {
@@ -766,6 +766,19 @@
               "dependsOn": [
                 "network",
                 "prerequisites"
+              ]
+            },
+            "byoProjectCapabilityHost": {
+              "condition": "[variables('useByoNetwork')]",
+              "type": "Microsoft.CognitiveServices/accounts/projects/capabilityHosts",
+              "apiVersion": "2025-04-01-preview",
+              "name": "[format('{0}/{1}/agents', variables('activeFoundryAccountName'), parameters('foundryProjectName'))]",
+              "properties": {
+                "capabilityHostKind": "Agents"
+              },
+              "dependsOn": [
+                "byoFoundryAccount::project",
+                "foundryAccount::project"
               ]
             },
             "foundryManagedNetwork": {
